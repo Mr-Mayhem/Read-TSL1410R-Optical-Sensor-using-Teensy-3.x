@@ -66,5 +66,5 @@ With the usb cable from the Teensy hooked up to your pc, Open the Processing ske
 
 If it raises an error on the serial, make sure the com port is set right. It may be off by 1 or something like that. It should match the com port set in Arduino IDE under Tools >> Port when your Teensy board is selcted under Tools >> Board:.
 
-You should see the frames counting up and the number of bytes in the serial buffer changing, and a plot of white dots that respond to changing light on the sensor. A bar along the top shows the individual pixel intensities as a greyscale color; black for dim light, white for bright light. A little square in the upper left corner is white while receiving data, red syncing, and black while waiting for more data.
+You should see the frames counting up and the number of bytes in the serial buffer changing, and a plot of white dots that respond to changing light on the sensor. A bar along the top shows the individual pixel intensities as a greyscale color; black for dim light, white for bright light. A little square in the upper left corner is white while receiving data, red while syncing, and black while waiting for more data.
 
