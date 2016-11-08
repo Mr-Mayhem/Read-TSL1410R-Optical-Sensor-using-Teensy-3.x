@@ -27,12 +27,15 @@ https://processing.org/
 ===============================================================================================================================
 Future improvements:
 ===============================================================================================================================
+
 Subpixel resolution edge detection.
 Passing data on to ESP8266 Wifi to Processing app.
 Remote control via serial or WiFi
+
 ===============================================================================================================================
 Installation:
 ===============================================================================================================================
+
 Wire the sensor to a Teensy on a breadboard, and consult the schematics in the TSL1402R datasheet, link above. 
 
 Use the parallel circuit. 
