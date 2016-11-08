@@ -69,7 +69,7 @@ void setup()
 
 void loop() 
 {
-  delay(50);
+  delay(15); // I slow Teensy 3.6 down so Processing sketch can keep up. Adjust or comment out as needed.
   Sensor.read(sensorByteArray, 2560);
   Serial.write(PREFIX); // PREFIX
   Serial.write(sensorByteArray, 2560);
