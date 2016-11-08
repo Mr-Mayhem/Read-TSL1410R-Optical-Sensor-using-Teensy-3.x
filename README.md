@@ -60,7 +60,7 @@ Your Arduino Sketchbook Location/Teensy_36_TSL1410R_To_Serial/Teensy_36_TSL1410R
 Your Processing Sketchbook Location/Teensy_36_TSL1410R_To_Serial/Teensy_36_TSL1410R_To_Serial.pde
 --------------------------------------------------------------------------------------------------
 
-Open the Teensy Arduino example sketch and upload it to Teensy 3.x 
+Open Arduino example file Teensy_36_TSL1410R_To_Serial.ino in the Arduino IDE, and upload it to Teensy 3.x. 
 
 With the usb cable from the Teensy hooked up to your pc, Open the Processing sketch and run it. 
 
