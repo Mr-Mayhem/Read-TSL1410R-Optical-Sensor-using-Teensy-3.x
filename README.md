@@ -1,12 +1,12 @@
 # Read-TSL1410R-Optical-Sensor-using-Teensy-3.x
-Includes Teensy 3.6 Arduino library, Example, Processing Demo
+Includes Teensy 3.6 Arduino library, Example, Processing Demo.
 
 Use a Teensy 3.x module to read the AMS TSL1410R optical sensor and plot pixel values in Processing.
 
 Inspired by:
 http://playground.arduino.cc/Main/TSL1402R
 
-The TSL1402R linear photodiode array optical sensor (main page), also note the significant Techical Docs section:
+The TSL1402R linear photodiode array optical sensor (main page), also note the significant Technical Docs section:
 http://ams.com/eng/Products/Light-Sensors/Linear-Array/TSL1410R
 
 TSL1402R PDF Datasheet:
