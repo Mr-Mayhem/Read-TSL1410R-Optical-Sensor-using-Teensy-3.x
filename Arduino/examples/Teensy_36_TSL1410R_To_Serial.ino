@@ -11,10 +11,10 @@
 #include <ADC.h> // https://github.com/pedvide/ADC
 //========================================================================================
 // Pins for the TSL1410R sensor.
-#define CLKpin  24 // <-- Arduino pin delivering the clock pulses to pin 4(CLK) of the TSL1410R
-#define SIpin   25 // <-- Arduino pin delivering the SI (serial-input) pulse to pin 2 of the TSL1410R
-#define Apin1   14 // <-- Arduino pin connected to pin 6 (analog output 1) of the TSL1410R
-#define Apin2   39 // <-- Arduino pin connected to pin 12 (analog output 2) (parallel mode only)
+#define CLKpin  24 // <-- Teensy 3.6 pin delivering the clock pulses to pin 4(CLK) of the TSL1410R
+#define SIpin   25 // <-- Teensy 3.6 pin delivering the SI (serial-input) pulse to pin 2 of the TSL1410R
+#define Apin1   14 // <-- Teensy 3.6 pin connected to pin 6 (analog output 1) of the TSL1410R
+#define Apin2   39 // <-- Teensy 3.6 pin connected to pin 12 (analog output 2) of the TSL1410R (parallel mode only)
 //========================================================================================
 ADC *adc = new ADC(); // adc object;
 ADC::Sync_result ADCresult; // makes Teensy ADC library read 2 pins at the same time using 2 seperate ADCs
