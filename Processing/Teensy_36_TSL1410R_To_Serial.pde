@@ -1,5 +1,3 @@
-import processing.serial.*;
-
 // This sketch receives and displays a point plot of sensor data from incoming serial
 // binary stream from a corresponding Arduino or Teensy TSL1410R sensor reader sketch.
 
@@ -18,40 +16,59 @@ import processing.serial.*;
 // by 512 data bytes, two data bytes per sensor value. 
 // (1080 sensor pixels X 2 = 2560)
 
+// ==============================================================================================
+// Imports:
+
+import processing.serial.*;
+
+// ==============================================================================================
 // Constants:
 
 // TSL1410R linear photodiode array chip has 1080 total pixels
-static final int NPIXELS = 1280;
+final int NPIXELS = 1280; 
 
-// number of screen pixels for each data point, used for drawing plot 
-// and dimmest pixel
-static final int WIDTH_PER_PT = 1;
+// set this to the number of bits in each Teensy ADC value read from the sensor
+final int NBITS_ADC = 12;
 
-// drives screen height, which = 4096 / SCREEN_HEIGHT (the highest sensor reading)
-static final int SCREEN_HEIGHT = 8;
- 
-// screen width = total pixels * 3 + 3
+final int HIGHEST_ADC_VALUE = int(pow(2.0, float(NBITS_ADC))-1);
+
+// number of screen pixels for each data point, used for drawing plot
+final int WIDTH_PER_PT = 1;
+
+// screen width
 final int SCREEN_WIDTH = NPIXELS*WIDTH_PER_PT;
 
-// twice the pixel count
-static final int SERIAL_BYTES_CHUNK_SIZE = NPIXELS * 2; //
+//  screen height = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR
+final int SCREEN_HEIGHT_DIVISOR = 8;
+
+//  screen height = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR
+final int SCREEN_HEIGHT = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR;
+
+// twice the pixel count because we use 2 bytes to represent each sensor pixel
+final int N_BYTES_PER_SENSOR_FRAME = NPIXELS * 2; //
 
 // the data bytes + PREFIX byte
-static final int PREFIX_AND_SERIAL_BYTES_CHUNK_SIZE = SERIAL_BYTES_CHUNK_SIZE + 1; 
+final int N_BYTES_PER_SENSOR_FRAME_PLUS1 = N_BYTES_PER_SENSOR_FRAME + 1; 
 
 //used to sync the filling of byteArray to the incoming serial stream
-static final int PREFIX = 0xFF;  
+final int PREFIX = 0xFF;  
 //static final int PREFIX_B = 0x00;
 
-// used for upscaling integers prior to mult or division so we don't need slower floating point
-static final int MathMultiplier = 256;   
+// ==============================================================================================
+// Global Variables:
 
-static final int SERIAL_NOT_ENOUGH_BYTES = 0;
-static final int SERIAL_SYNCING = 1;
-static final int SERIAL_READ_OK = 2;
+// used for upscaling integers prior to mult or division so we don't need slower floating point
+final int MathMultiplier = 256;   
+
+final int SERIAL_NOT_ENOUGH_BYTES = 0;
+final int SERIAL_SYNCING = 1;
+final int SERIAL_READ_OK = 2;
+
+// ==============================================================================================
+// Arrays:
 
 // array of raw serial data bytes
-byte[] byteArray = new byte[SERIAL_BYTES_CHUNK_SIZE]; 
+byte[] byteArray = new byte[N_BYTES_PER_SENSOR_FRAME]; 
 
 // array of sensor values
 int[] pixArray = new int[NPIXELS + 3]; 
@@ -77,15 +94,13 @@ boolean calRequestFlag = false;
 // number of bytes actually read out from the serial buffer
 int bytesRead = 0;
 
-// user to count frames
+// used to count frames
 int chartRedraws = 0;
 
-// user to store the number of bytes present in the serial buffer
+// used to store the number of bytes present in the serial buffer
 int availableBytes = 0;
 
-boolean Synced = false;
-
-// user to show the number of bytes present in the serial buffer
+// used to show the number of bytes present in the serial buffer
 int availableBytesDraw = 0;
 
 int lowestBrightness = 2000;
@@ -99,13 +114,17 @@ float sensorWidthAllPixels = 16.256; // millimeters
 
 float widthsubpixellp = 2;
 int captureCount = 0;
-// set serial port object
+
+// ==============================================================================================
+// Set the Serial Port object
 Serial myPort;  
+
+// ==============================================================================================
 
 void setup() 
 {
   // Set up main window
-  surface.setSize(SCREEN_WIDTH, (4096/SCREEN_HEIGHT) + 55); // screen width, height
+  surface.setSize(SCREEN_WIDTH, (SCREEN_HEIGHT) + 55); // screen width, height
   background(0); // Arduino green color
   strokeWeight(1); // thickness of lines and outlines
   stroke(255); // white lines and outlines
@@ -117,13 +136,12 @@ void setup()
   // Set up serial connection
   myPort = new Serial(this, "COM5", 12500000);
   myPort.clear();
-  
 }
 
 void draw() {
   availableBytes = myPort.available();
   // If there are enough bytes
-  if (availableBytes > PREFIX_AND_SERIAL_BYTES_CHUNK_SIZE+1) { 
+  if (availableBytes > N_BYTES_PER_SENSOR_FRAME_PLUS1) { 
     // Remove the next byte from the serial buffer, 
     // and compare it to PREFIX. 
     if (myPort.read() == PREFIX) {
@@ -171,7 +189,7 @@ void draw() {
         // Plot a point on the canvas for this pixel
         stroke(255);
         //fill(255);
-        point(i*WIDTH_PER_PT, height - pixArray[i]/SCREEN_HEIGHT);
+        point(i*WIDTH_PER_PT, SCREEN_HEIGHT - pixArray[i]/SCREEN_HEIGHT_DIVISOR);
         
         // prepare color to correspond to sensor pixel reading
         pixelColor = pixArray[i] /16;
@@ -194,11 +212,11 @@ void draw() {
       rect(10, 15, 12, 12);
     }
   } else {
-      // color the receive status indicator to the background color to indicate not enough 
-      // data is present in the receive serial data buffer this time around
-      stroke(255);
-      fill(0);
-      rect(10, 15, 12, 12);
+    // color the receive status indicator to the background color to indicate not enough 
+    // data is present in the receive serial data buffer this time around
+    stroke(255);
+    fill(0);
+    rect(10, 15, 12, 12);
   }
   //captureCount++;
   //if (captureCount ==500) {
@@ -243,7 +261,7 @@ void zeroCoefficients() {
 void calcAndDisplaySensorShadowPos()
 {
   //double calibFactor = 31.38912669 / 2;
-  
+
   int x0, x1, x2, x3;
   float minstep, maxstep;
   int minsteploc, maxsteploc;
@@ -342,28 +360,28 @@ void calcAndDisplaySensorShadowPos()
   // Mark minsteploc with green circle
   noFill();
   stroke(0, 255, 0);
-  ellipse(minsteploc * WIDTH_PER_PT, height-pixArray[minsteploc]/SCREEN_HEIGHT, WIDTH_PER_PT, WIDTH_PER_PT);
+  ellipse(minsteploc * WIDTH_PER_PT, SCREEN_HEIGHT-pixArray[minsteploc]/SCREEN_HEIGHT_DIVISOR, WIDTH_PER_PT, WIDTH_PER_PT);
  
   // Mark center of width ((filWidth/2) + minsteploc) with white circle
   
   stroke(255);
-  ellipse(subPixelX, height-pixArray[filPos]/SCREEN_HEIGHT, WIDTH_PER_PT, WIDTH_PER_PT);
+  ellipse(subPixelX, SCREEN_HEIGHT-pixArray[filPos]/SCREEN_HEIGHT_DIVISOR, WIDTH_PER_PT, WIDTH_PER_PT);
 
   // Mark maxsteploc with red circle
   stroke(255, 0, 0);
-  ellipse(maxsteploc * WIDTH_PER_PT, height-pixArray[maxsteploc]/SCREEN_HEIGHT, WIDTH_PER_PT, WIDTH_PER_PT);      
+  ellipse(maxsteploc * WIDTH_PER_PT, SCREEN_HEIGHT-pixArray[maxsteploc]/SCREEN_HEIGHT_DIVISOR, WIDTH_PER_PT, WIDTH_PER_PT);      
       
     if (widthsubpixel > 0)
     {
       //float mmWidth = widthsubpixellp * sensorPixelSpacing;
       fill(255);
-      //text("filWidth = " + filWidth, 10, height-10);
-      //text("widthsubpixel = " + String.format("%.3f", widthsubpixel), 200, height-10);
-      //text("mmWidth = " + String.format("%.3f", mmWidth), 400, height-10);
-      text("filPos = " + filPos, 10, height-10);
-      //text("subPixelX = " + subPixelX, 600, height-10);
-      text("filPrecisePos = " + String.format("%.3f", filPrecisePos), 200, height-10);
-      text("filPreciseMMPos = " + String.format("%.3f", filPreciseMMPos), 400, height-10);
+      //text("filWidth = " + filWidth, 10, SCREEN_HEIGHT-10);
+      //text("widthsubpixel = " + String.format("%.3f", widthsubpixel), 200, SCREEN_HEIGHT-10);
+      //text("mmWidth = " + String.format("%.3f", mmWidth), 400, SCREEN_HEIGHT-10);
+      text("filPos = " + filPos, 10, SCREEN_HEIGHT-10);
+      //text("subPixelX = " + subPixelX, 600, SCREEN_HEIGHT-10);
+      text("filPrecisePos = " + String.format("%.3f", filPrecisePos), 200, SCREEN_HEIGHT-10);
+      text("filPreciseMMPos = " + String.format("%.3f", filPreciseMMPos), 400, SCREEN_HEIGHT-10);
       
   }
 }
