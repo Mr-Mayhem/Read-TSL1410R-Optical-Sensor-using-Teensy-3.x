@@ -11,7 +11,7 @@ See: https://github.com/Mr-Mayhem/Teensy_36_TSL1410R_To_Serial/
 */
 
 // This sketch receives and displays a point plot of sensor data from incoming serial
-// binary stream from a corresponding Arduino or Teensy TSL1410R sensor reader sketch.
+// binary stream from a corresponding Arduino or Teensy sensor reader sketch.
 
 // This version includes different serial port code, using buffer until and serial event, 
 // which avoids a long start-up pause.
@@ -39,7 +39,7 @@ import processing.serial.*;
 // ==============================================================================================
 // colors
 color COLOR_ORIGINAL_DATA = color(255);                   // white
-color COLOR_INTERPERPOLATED_DATA   = color(0, 255, 0);   // red
+color COLOR_INTERPERPOLATED_DATA   = color(0, 255, 0);    // red
 color COLOR_COVOLUTION_IMPULSE_DATA = color(255, 255, 0); //yellow
 color COLOR_COVOLUTION_OUTPUT_DATA = color(255,165,0);    // orange
 color COLOR_PARABOLA_FIT_DATA = color(0,255,255);         // cyan
@@ -112,7 +112,7 @@ int[] calCoefficients = new int[INTERP_OUT_LENGTH];
 // Global Variables:
 
 // global sum of all sensor values (used for calibration)
-int pixArraySum = 0; 
+int sensorPixelSum = 0; 
 
 // global average of all sensor values for the current
 // data frame 
@@ -159,16 +159,16 @@ int Raw_Data_Ptr_D = 0;    // use for linear or cosine, also edit 'outerPtr-2' i
 float muValue = 0;
 
 // ==============================================================================================
-// Set the Serial Port object
-
+// Set Objects
 Serial myPort;  
-
 // ==============================================================================================
 
 void setup() 
 {
   // Set up main window
+
   surface.setSize(SCREEN_WIDTH, (SCREEN_HEIGHT) + 55); // screen width, height
+  zeroCoefficients();
   background(0); // Arduino green color
   strokeWeight(1); // thickness of lines and outlines
   stroke(255); // white lines and outlines
@@ -176,9 +176,7 @@ void setup()
   textSize(15);
   frameRate(500);
   noLoop();
-
-  zeroCoefficients();
- 
+  
   // Set up serial connection
   myPort = new Serial(this, "COM5", 12500000);
   myPort.bufferUntil(PREFIX);
@@ -205,7 +203,7 @@ void draw() {
   //  setCoefficients(); //set the calibration coefficients
   //}
   
-  //pixArraySum = 0;
+  //sensorPixelSum = 0;
   //storeSensorValue(0);
   //prevSensorValue = pixArray[0];
   // Store and Display pixel values
