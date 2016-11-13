@@ -1,51 +1,80 @@
+/*
+Teensy_36_TSL1410R_To_Serial.pde, 
+This sketch receives and displays a point plot of sensor data from incoming serial
+// binary stream from a corresponding Arduino or Teensy TSL1410R sensor reader sketch.
+
+Created by Douglas Mayhew, November 1, 2016.
+
+Released into the public domain.
+
+See: https://github.com/Mr-Mayhem/Teensy_36_TSL1410R_To_Serial/
+*/
+
 // This sketch receives and displays a point plot of sensor data from incoming serial
 // binary stream from a corresponding Arduino or Teensy TSL1410R sensor reader sketch.
 
-// An Arduino or Teensy is wired to TSL1410R linear photodiode array chip, using the 
-// sensor chip's parallel mode circuit suggestion, which reads two analog values 
-// on each clock cycle applied to the sensor chip, (we don't use the sensor chip
-// 'serial' mode which reads only one value per applied clock). 
-// In the Teensy 3.x version of the Arduino sketch, we go one step further,
-// and read both analog pixel values at the same instant, rather than sequentially.
+// This version includes different serial port code, using buffer until and serial event, 
+// which avoids a long start-up pause.
 
-// The Arduino sketch is programmed to send the sensor values over the usb serial 
+// An Arduino or Teensy is wired to the sensor, using the sensor chip's parallel-mode 
+// circuit suggestion, which reads two analog values on each clock cycle applied to the 
+// sensor chip, (we don't use the sensor chip 'serial' mode which reads only one value 
+// per applied clock). 
+
+// In the Teensy 3.x version of the Arduino sketch, we go one step further than usual,
+// and read both analog pixel values at the same instant using seperate on-chip ADCs, 
+// rather than sequentially.
+
+// The Arduino sketch is programmed to send the sensor values over the USB serial 
 // connection to a PC running this Processing sketch.
 
 // Each integer sensor value is sent as two bytes over the serial 
 // connection. The Arduino program sends one PREFIX byte of value 255 followed 
-// by 512 data bytes, two data bytes per sensor value. 
-// (1080 sensor pixels X 2 = 2560)
+// by the data bytes, two per sensor value. 
 
 // ==============================================================================================
-// Imports:
+// imports:
 
 import processing.serial.*;
-
+// ==============================================================================================
+// colors
+color COLOR_ORIGINAL_DATA = color(255);                   // white
+color COLOR_INTERPERPOLATED_DATA   = color(0, 255, 0);   // red
+color COLOR_COVOLUTION_IMPULSE_DATA = color(255, 255, 0); //yellow
+color COLOR_COVOLUTION_OUTPUT_DATA = color(255,165,0);    // orange
+color COLOR_PARABOLA_FIT_DATA = color(0,255,255);         // cyan
 // ==============================================================================================
 // Constants:
 
-// TSL1410R linear photodiode array chip has 1080 total pixels
-final int NPIXELS = 1280; 
+// TSL1402R linear photodiode array chip has 256 total pixels
+final int SENSOR_PIXELS = 1280;
 
 // set this to the number of bits in each Teensy ADC value read from the sensor
 final int NBITS_ADC = 12;
 
 final int HIGHEST_ADC_VALUE = int(pow(2.0, float(NBITS_ADC))-1);
 
-// number of screen pixels for each data point, used for drawing plot
-final int WIDTH_PER_PT = 1;
+// number of screen pixels for each data point, used for drawing plot 
+final int SCREEN_X_MULTIPLIER = 1;
 
 // screen width
-final int SCREEN_WIDTH = NPIXELS*WIDTH_PER_PT;
+final int SCREEN_WIDTH = SENSOR_PIXELS*SCREEN_X_MULTIPLIER;
 
 //  screen height = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR
-final int SCREEN_HEIGHT_DIVISOR = 8;
+final int SCREEN_HEIGHT_DIVISOR = 16;
 
 //  screen height = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR
 final int SCREEN_HEIGHT = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR;
 
+// number of extra inserted data points for each original data point
+final int NUM_INTERP_POINTS = 1; 
+
+final int RAW_DATA_SPACING = NUM_INTERP_POINTS + 1;  //spacing of original data in the array
+
+final int INTERP_OUT_LENGTH = (SENSOR_PIXELS * RAW_DATA_SPACING) - NUM_INTERP_POINTS; //number of discrete values in the output array
+
 // twice the pixel count because we use 2 bytes to represent each sensor pixel
-final int N_BYTES_PER_SENSOR_FRAME = NPIXELS * 2; //
+final int N_BYTES_PER_SENSOR_FRAME = SENSOR_PIXELS * 2; //
 
 // the data bytes + PREFIX byte
 final int N_BYTES_PER_SENSOR_FRAME_PLUS1 = N_BYTES_PER_SENSOR_FRAME + 1; 
@@ -54,27 +83,33 @@ final int N_BYTES_PER_SENSOR_FRAME_PLUS1 = N_BYTES_PER_SENSOR_FRAME + 1;
 final int PREFIX = 0xFF;  
 //static final int PREFIX_B = 0x00;
 
+// used for upscaling integers prior to mult or division so we don't need slower 
+// floating point
+final int MathMultiplier = 256;   
+
+// use even impulseDataLength to 
+//produce an even integer phase offset
+final int IMPULSE_KERNEL_DATA_LENGTH = 19; 
+
+final int CONVOLUTION_OUTPUT_DATA_LENGTH = SENSOR_PIXELS + IMPULSE_KERNEL_DATA_LENGTH;
+//  a decimal fraction between 0 and 1, representing smaller increment of x position 
+// relative to original data points. 
+final float muIncrement = 1/float(RAW_DATA_SPACING);
 // ==============================================================================================
 // Arrays:
-
 // array of raw serial data bytes
-byte[] byteArray = new byte[N_BYTES_PER_SENSOR_FRAME]; 
+byte[] byteArray = new byte[N_BYTES_PER_SENSOR_FRAME+1]; 
 
-// array of sensor values
-int[] pixArray = new int[NPIXELS + 3]; 
+// array for sensor data and interpolated data all together
+int[] data_Array = new int[INTERP_OUT_LENGTH];
+
+//int[] convolutionArray = new int[CONVOLUTION_OUTPUT_DATA_LENGTH];
 
 // array of integer coefficients for calibrating data
-int[] calCoefficients = new int[NPIXELS];  
+int[] calCoefficients = new int[INTERP_OUT_LENGTH]; 
 
 // ==============================================================================================
 // Global Variables:
-
-// used for upscaling integers prior to mult or division so we don't need slower floating point
-final int MathMultiplier = 256;   
-
-final int SERIAL_NOT_ENOUGH_BYTES = 0;
-final int SERIAL_SYNCING = 1;
-final int SERIAL_READ_OK = 2;
 
 // global sum of all sensor values (used for calibration)
 int pixArraySum = 0; 
@@ -115,8 +150,17 @@ float sensorWidthAllPixels = 16.256; // millimeters
 float widthsubpixellp = 2;
 int captureCount = 0;
 
+int outerPtr = 0;          // outer loop pointer 0
+int Raw_Data_Ptr_A = 0;    //indexes for original data, feeds interpolation function inputs
+int Raw_Data_Ptr_B = 0;
+int Raw_Data_Ptr_C = 0;    // use for linear or cosine, also edit 'outerPtr-2' in inner loop to 'outerPtr'
+int Raw_Data_Ptr_D = 0;    // use for linear or cosine, also edit 'outerPtr-2' in inner loop to 'outerPtr'
+
+float muValue = 0;
+
 // ==============================================================================================
 // Set the Serial Port object
+
 Serial myPort;  
 
 // ==============================================================================================
@@ -130,99 +174,91 @@ void setup()
   stroke(255); // white lines and outlines
   noFill(); // outlines only for now
   textSize(15);
-  frameRate(1000);
+  frameRate(500);
+  noLoop();
+
   zeroCoefficients();
  
   // Set up serial connection
   myPort = new Serial(this, "COM5", 12500000);
-  myPort.clear();
+  myPort.bufferUntil(PREFIX);
 }
 
-void draw() {
-  availableBytes = myPort.available();
-  // If there are enough bytes
-  if (availableBytes > N_BYTES_PER_SENSOR_FRAME_PLUS1) { 
-    // Remove the next byte from the serial buffer, 
-    // and compare it to PREFIX. 
-    if (myPort.read() == PREFIX) {
-      // we found PREFIX (unique byte value 255) and thus are synced, 
-      //which means the sensor data immediately follows...
-      bytesRead = myPort.readBytes(byteArray); // Read the sensor data bytes to byteArray[]
-      chartRedraws++;
-      if (chartRedraws >= 60) {
-       chartRedraws = 0;
-       availableBytesDraw = availableBytes;
-      }
-      background(0); // clear the canvas
-      fill(255);
-      text(chartRedraws, 10, 50);
-      // show amount of bytes waiting in the serial buffer
-      text(availableBytesDraw, 50, 50);
-      
-      //text(frameRate, 200, 22);
+void serialEvent(Serial p) { 
+  bytesRead = p.readBytes(byteArray);
+  redraw();
+} 
 
-      // color the receive status indicator white to indicate a successful serial data read
-      stroke(255);
-      fill(255);
-      rect(10, 15, 12, 12);
-      
-      //if (calRequestFlag) { // if a calibration was requested via mouseclick
-      //  setCoefficients(); //set the calibration coefficients
-      //}
-      
-      //pixArraySum = 0;
-      //storeSensorValue(0);
-      //prevSensorValue = pixArray[0];
-      // Store and Display pixel values
-      for(int i=0; i < NPIXELS; i++) {
-        // Read a pair of bytes from the byte array, convert them into an integer, 
-        // shift right 2 places, and 
-        // copy result into pixArray[]
-        pixArray[i] = (byteArray[i<<1]<< 8 | (byteArray[(i<<1) + 1] & 0xFF))>>2;
-        //pixArraySum =+ pixArray[i];
-        
-        //// Apply calibration to pixArray[i] value if coefficients are set
-        //if (isCalibrated) {
-        //  pixArray[i] = (pixArray[i] * calCoefficients[i]) / MathMultiplier;
-        //}
-        
-        // Plot a point on the canvas for this pixel
-        stroke(255);
-        //fill(255);
-        point(i*WIDTH_PER_PT, SCREEN_HEIGHT - pixArray[i]/SCREEN_HEIGHT_DIVISOR);
-        
-        // prepare color to correspond to sensor pixel reading
-        pixelColor = pixArray[i] /16;
-        // Plot a row of pixels near the top of the screen ,
-        // and color them with the 0 to 255 greyscale sensor value
-        noStroke();
-        fill(pixelColor, pixelColor, pixelColor);
-        rect(i*WIDTH_PER_PT, 0, 4, 10);
-      }
-        //sensorAverageValue = pixArraySum / NPIXELS;
-        
- 
-       // calculate and display shadow location with subpixel accuracy
-       // calcAndDisplaySensorShadowPos();
-    } else {
-      // we are not synced
-      // color the receive status indicator red to indicate not synced;
-      stroke(255);
-      fill(255, 255, 255);
-      rect(10, 15, 12, 12);
-    }
-  } else {
-    // color the receive status indicator to the background color to indicate not enough 
-    // data is present in the receive serial data buffer this time around
-    stroke(255);
-    fill(0);
-    rect(10, 15, 12, 12);
+void draw() {
+  chartRedraws++;
+  if (chartRedraws >= 60) {
+   chartRedraws = 0;
+   availableBytesDraw = myPort.available();
   }
-  //captureCount++;
-  //if (captureCount ==500) {
-  //  captureCount = 0;
-  //  saveFrame("Processing_Screen_Capture-######.png");
+  background(0); // clear the canvas
+  fill(255);
+  text(chartRedraws, 10, 50);
+  // show amount of bytes waiting in the serial buffer
+  text(availableBytesDraw, 50, 50);
+  
+  //if (calRequestFlag) { // if a calibration was requested via mouseclick
+  //  setCoefficients(); //set the calibration coefficients
   //}
+  
+  //pixArraySum = 0;
+  //storeSensorValue(0);
+  //prevSensorValue = pixArray[0];
+  // Store and Display pixel values
+  for(outerPtr=0; outerPtr < SENSOR_PIXELS-1; outerPtr++) {
+    Raw_Data_Ptr_A = (outerPtr - 3) * RAW_DATA_SPACING;
+    Raw_Data_Ptr_B = (outerPtr - 2) * RAW_DATA_SPACING;   
+    Raw_Data_Ptr_C = (outerPtr - 1) * RAW_DATA_SPACING;
+    Raw_Data_Ptr_D = outerPtr * RAW_DATA_SPACING;
+
+    // Read a pair of bytes from the byte array, convert them into an integer, 
+    // shift right 2 places, and copy result into data_Array[]
+    data_Array[Raw_Data_Ptr_D] = (byteArray[outerPtr<<1]<< 8 | (byteArray[(outerPtr<<1) + 1] & 0xFF))>>2;
+    //data_ArraySum =+ pixArray[i];
+    
+    //// Apply calibration to pixArray[i] value if coefficients are set
+    //if (isCalibrated) {
+    //  data_Array[i] = (data_Array[i] * calCoefficients[i]) / MathMultiplier;
+    //}
+    
+    // Plot a point on the canvas for this pixel
+    stroke(COLOR_ORIGINAL_DATA);
+    point(outerPtr*SCREEN_X_MULTIPLIER, SCREEN_HEIGHT - (data_Array[Raw_Data_Ptr_D]/SCREEN_HEIGHT_DIVISOR));
+    
+    // prepare color to correspond to sensor pixel reading
+    pixelColor = int(map(data_Array[Raw_Data_Ptr_D], 0, HIGHEST_ADC_VALUE, 0, 255));
+    // Plot a row of pixels near the top of the screen ,
+    // and color them with the 0 to 255 greyscale sensor value
+    noStroke();
+    fill(pixelColor, pixelColor, pixelColor);
+    rect(outerPtr*SCREEN_X_MULTIPLIER-1, 0, 4, 10);
+    // Interpolate
+    //println("outerPtr: " + outerPtr + " Raw_Data_Ptr_A: " + Raw_Data_Ptr_A + " Raw_Data_Ptr_B: " + Raw_Data_Ptr_B + " Raw_Data_Ptr_C: " + Raw_Data_Ptr_C + " Raw_Data_Ptr_D: " + Raw_Data_Ptr_D);
+    
+    if (Raw_Data_Ptr_A > -1) {
+      muValue=0;
+      for (int innerPtr = 1; innerPtr < RAW_DATA_SPACING; innerPtr++) {
+        muValue = muIncrement * innerPtr; // increment mu
+        int interpPtr = Raw_Data_Ptr_A + innerPtr;
+        //println("innerPtr: " + innerPtr + " interpPtr: " + interpPtr + " muValue: " + muValue);
+        
+        data_Array[interpPtr] = int(Breeuwsma_Catmull_Rom_Interpolate(data_Array[Raw_Data_Ptr_A], data_Array[Raw_Data_Ptr_B], data_Array[Raw_Data_Ptr_C], data_Array[Raw_Data_Ptr_D], muValue));
+ 
+        // scale the offset for the screen
+        int scaledXOffset = int(map(innerPtr, 0, RAW_DATA_SPACING, 0, SCREEN_X_MULTIPLIER)); 
+        
+        //strokeWeight(2);
+        
+        // plot an interpolated point using the scaled x offset
+        stroke(COLOR_INTERPERPOLATED_DATA);
+        point(((outerPtr-2)*SCREEN_X_MULTIPLIER)+scaledXOffset, SCREEN_HEIGHT - (data_Array[interpPtr]/SCREEN_HEIGHT_DIVISOR));
+        }
+    }
+  }
 }
 
 void setCoefficients() {
@@ -231,10 +267,10 @@ void setCoefficients() {
   
   println("Calibrate Begin");
 
-  for(int i=0; i < NPIXELS; i++) {
-    if (pixArray[i] > 0) { // value is greater than zero
+  for(int i=0; i < SENSOR_PIXELS; i++) {
+    if (data_Array[i] > 0) { // value is greater than zero
       // set the coeffieient
-      calCoefficients[i] = (sensorAverageValue * MathMultiplier) / pixArray[i]; 
+      calCoefficients[i] = round((sensorAverageValue * MathMultiplier) / data_Array[i]); 
       println(i + " " + calCoefficients[i]);
     } else { // value is less than zero
     //abort the calibration and reset all the coefficients
@@ -258,139 +294,56 @@ void zeroCoefficients() {
   }
 }
 
-void calcAndDisplaySensorShadowPos()
+float LinearInterpolate(float y1, float y2, float mu)
 {
-  //double calibFactor = 31.38912669 / 2;
-
-  int x0, x1, x2, x3;
-  float minstep, maxstep;
-  int minsteploc, maxsteploc;
-  int ct;
-
-  float a1, b1, c1, a2, b2, c2, m1, m2, mdiff; //sub pixel quadratic interpolation variables
-  float widthsubpixel; 
-  float filPrecisePos;
-  float filPreciseMMPos;
-  
-  int filWidth = 0;
-  int filPos = 0;
-  int startPos = 0, endPos = NPIXELS;
-  int subPixelX = 0;
-  
-  minstep = 0;
-  maxstep = 0;
-  minsteploc = 255; 
-  maxsteploc = 255;
-  //clear the sub-pixel buffers
-  x0 = x1 = x2 = x3 = 0;
-  a1 = b1 = c1 = a2 = b2 = c2 = m1 = m2 = 0;
-  widthsubpixel = 0;
-  ct = startPos-2;  //index to count samples  need to load buffer for 2 steps to subtract x2-x1
-
-  for (int i=startPos; i<endPos; i++)
-  {
-    x3=x2;  
-    x2=x1;
-    x1=x0;
-    x0=pixArray[i];
-    ct = ct + 1;
-
-    if (ct > startPos+1 && ct < endPos-2)
-    {
-      if (x1<x2)
-      {
-        if (minstep<x2-x1)
-        {
-          minstep=x2-x1;
-          minsteploc=ct;
-          c1=x1-x0;
-          b1=x2-x1;
-          a1=x3-x2;
-        }
-      } else if(x1>x2)
-      {
-        if (maxstep<x1-x2)
-        {
-          maxstep=x1-x2;
-          maxsteploc=ct;
-          c2=x1-x0;
-          b2=x2-x1;
-          a2=x3-x2;
-        }
-      }
-    }
-  }
-  
-
-  if (minstep>16 && maxstep>16)  //check for significant threshold
-  {
-    filWidth=maxsteploc-minsteploc;
-  } else {
-    filWidth=0;
-  }
-    
-  if (filWidth>103)  //check for width overflow or out of range (15.7pixels per mm, 65535/635=103)
-    {
-      filWidth=0;
-    }
-   
-    //sub-pixel edge detection using interpolation
-    m1=((a1-c1) / (a1+c1-(b1*2)))/2;
-    m2=((a2-c2) / (a2+c2-(b2*2)))/2;
-    
-    mdiff = m2-m1; 
-    
-    if (filWidth>10) {    //check for a measurement > 1mm  otherwise treat as noise
-      widthsubpixel=filWidth+mdiff; 
-      //widthsubpixellp = widthsubpixellp * 0.9 + widthsubpixel * 0.1;
-      filPos = (filWidth/2) + minsteploc;
-      filPrecisePos = minsteploc + (widthsubpixel/2);
-    } else {
-      widthsubpixel=0;
-      filPos = 0;
-      filPrecisePos = 0;
-    }
-     
-     //widthsubpixellp = ((widthsubpixel - widthsubpixellp) * 0.1) + widthsubpixellp; 
-     
-      subPixelX = (filPos * WIDTH_PER_PT) + round(map(mdiff, -0.76, 0.76, -WIDTH_PER_PT/2, WIDTH_PER_PT/2));
-      
-      filPreciseMMPos = filPrecisePos * sensorPixelSpacing;
- 
-  // Mark minsteploc with green circle
-  noFill();
-  stroke(0, 255, 0);
-  ellipse(minsteploc * WIDTH_PER_PT, SCREEN_HEIGHT-pixArray[minsteploc]/SCREEN_HEIGHT_DIVISOR, WIDTH_PER_PT, WIDTH_PER_PT);
- 
-  // Mark center of width ((filWidth/2) + minsteploc) with white circle
-  
-  stroke(255);
-  ellipse(subPixelX, SCREEN_HEIGHT-pixArray[filPos]/SCREEN_HEIGHT_DIVISOR, WIDTH_PER_PT, WIDTH_PER_PT);
-
-  // Mark maxsteploc with red circle
-  stroke(255, 0, 0);
-  ellipse(maxsteploc * WIDTH_PER_PT, SCREEN_HEIGHT-pixArray[maxsteploc]/SCREEN_HEIGHT_DIVISOR, WIDTH_PER_PT, WIDTH_PER_PT);      
-      
-    if (widthsubpixel > 0)
-    {
-      //float mmWidth = widthsubpixellp * sensorPixelSpacing;
-      fill(255);
-      //text("filWidth = " + filWidth, 10, SCREEN_HEIGHT-10);
-      //text("widthsubpixel = " + String.format("%.3f", widthsubpixel), 200, SCREEN_HEIGHT-10);
-      //text("mmWidth = " + String.format("%.3f", mmWidth), 400, SCREEN_HEIGHT-10);
-      text("filPos = " + filPos, 10, SCREEN_HEIGHT-10);
-      //text("subPixelX = " + subPixelX, 600, SCREEN_HEIGHT-10);
-      text("filPrecisePos = " + String.format("%.3f", filPrecisePos), 200, SCREEN_HEIGHT-10);
-      text("filPreciseMMPos = " + String.format("%.3f", filPreciseMMPos), 400, SCREEN_HEIGHT-10);
-      
-  }
+   return(y1*(1-mu)+y2*mu);
 }
 
-void mousePressed() {
-  println("mousePressed");
-  if (isCalibrated){  // used to flip between modes using mouseclicks
-    zeroCoefficients();
-  } else {
-    calRequestFlag = true;
-  }
+public float CosineInterpolate(float y1, float y2, float mu) {
+   float mu2;
+
+   mu2 = (1-cos(mu*PI))/2;
+   return(y1*(1-mu2)+y2*mu2);
 }
+
+float CubicInterpolate(float y0,float y1, float y2,float y3, float mu)
+{
+   float a0,a1,a2,a3,mu2;
+
+   mu2 = mu*mu;
+   a0 = y3 - y2 - y0 + y1;
+   a1 = y0 - y1 - a0;
+   a2 = y2 - y0;
+   a3 = y1;
+
+   return(a0*mu*mu2+a1*mu2+a2*mu+a3);
+}
+
+float Breeuwsma_Catmull_Rom_Interpolate(float y0,float y1, float y2,float y3, float mu)
+{
+  
+  // Originally from Paul Breeuwsma http://www.paulinternet.nl/?page=bicubic
+  // "We could simply use derivative 0 at every point, but we obtain 
+  // smoother curves when we use the slope of a line between the 
+  // previous and the next point as the derivative at a point. In that 
+  // case the resulting polynomial is called a Catmull-Rom spline."
+  // Copied from version at http://paulbourke.net/miscellaneous/interpolation/
+
+   float a0,a1,a2,a3,mu2;
+   mu2 = mu*mu;
+   a0 = -0.5*y0 + 1.5*y1 - 1.5*y2 + 0.5*y3;
+   a1 = y0 - 2.5*y1 + 2*y2 - 0.5*y3;
+   a2 = -0.5*y0 + 0.5*y2;
+   a3 = y1;
+
+   return(a0*mu*mu2+a1*mu2+a2*mu+a3);
+}
+
+//void mousePressed() {
+//  println("mousePressed");
+//  if (isCalibrated){  // used to flip between modes using mouseclicks
+//    zeroCoefficients();
+//  } else {
+//    calRequestFlag = true;
+//  }
+//}
