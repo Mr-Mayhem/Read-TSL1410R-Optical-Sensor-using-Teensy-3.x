@@ -28,15 +28,13 @@ https://processing.org/
 Latest improvements:
 ===============================================================================================================================
 
-This version includes different serial port code, using bufferuntil and serialevent, 
-which avoids a long start-up pause and latency.
+This version includes different serial port code, using bufferuntil and serialevent, which avoids a long start-up pause and latency. The earlier code had the plot lagging way behind until it caught up.
 
-Added an interpolation feature, so setting NUM_INTERP_POINTS > 0 will draw green
-colored points in-between the original data points. They are stored in the data
-array alongside the original data. (The original data is spaced out in the array, 
-to allow room for the additional interpolated points) This setup is just for now, 
-soon, to gain efficiency, we will only interpolate the 'interesting data' where 
-the shadow is found, after some other soon-to-be-added DSP steps.
+I added an interpolation feature, so setting NUM_INTERP_POINTS > 0 will draw green colored points in-between the original data points. You can turn off interpolation by setting NUM_INTERP_POINTS to 0. They are stored in the data array alongside the original data. (The original data is spaced out in the array, to allow room for the additional interpolated points) 
+The default method is cubic interpolation, but you can change to 3 others by swapping them in.
+
+Soon, to gain efficiency, we will only interpolate the 'interesting data' where the shadow is found, after some other DSP steps.
+For now, there is interpolation on the whole data frame, or none at all if NUM_INTERP_POINTS is set to 0.
 
 ===============================================================================================================================
 Future improvements:
