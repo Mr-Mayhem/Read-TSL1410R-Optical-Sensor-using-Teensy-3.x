@@ -14,7 +14,7 @@ See: https://github.com/Mr-Mayhem/Teensy_36_TSL1410R_To_Serial/
 // binary stream from a corresponding Arduino or Teensy sensor reader sketch.
 
 // This version includes different serial port code, using buffer until and serial event, 
-// which avoids a long start-up pause.
+// which avoids a long start-up pause and latency.
 
 // Added an interpolation feature, so setting NUM_INTERP_POINTS > 0 will draw green
 // colored points in-between the original data points. They are stored in the data
@@ -62,13 +62,13 @@ final int NBITS_ADC = 12;
 final int HIGHEST_ADC_VALUE = int(pow(2.0, float(NBITS_ADC))-1);
 
 // number of screen pixels for each data point, used for drawing plot 
-final int SCREEN_X_MULTIPLIER = 1;
+final int SCREEN_X_MULTIPLIER = 2;
 
 // screen width
 final int SCREEN_WIDTH = SENSOR_PIXELS*SCREEN_X_MULTIPLIER;
 
 //  screen height = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR
-final int SCREEN_HEIGHT_DIVISOR = 16;
+final int SCREEN_HEIGHT_DIVISOR = 8;
 
 //  screen height = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR
 final int SCREEN_HEIGHT = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR;
@@ -251,7 +251,7 @@ void draw() {
         int interpPtr = Raw_Data_Ptr_A + innerPtr;
         //println("innerPtr: " + innerPtr + " interpPtr: " + interpPtr + " muValue: " + muValue);
         
-        data_Array[interpPtr] = int(Breeuwsma_Catmull_Rom_Interpolate(data_Array[Raw_Data_Ptr_A], data_Array[Raw_Data_Ptr_B], data_Array[Raw_Data_Ptr_C], data_Array[Raw_Data_Ptr_D], muValue));
+        data_Array[interpPtr] = int(CubicInterpolate(data_Array[Raw_Data_Ptr_A], data_Array[Raw_Data_Ptr_B], data_Array[Raw_Data_Ptr_C], data_Array[Raw_Data_Ptr_D], muValue));
  
         // scale the offset for the screen
         int scaledXOffset = int(map(innerPtr, 0, RAW_DATA_SPACING, 0, SCREEN_X_MULTIPLIER)); 
