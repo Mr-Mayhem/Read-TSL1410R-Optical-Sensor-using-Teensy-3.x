@@ -91,7 +91,7 @@ final int PREFIX = 0xFF;
 //static final int PREFIX_B = 0x00;
 
 // used for upscaling integers prior to mult or division so we don't need slower 
-// floating point
+// floating point, used only in calibration routines and currently commented out
 final int MathMultiplier = 256;   
 
 // use even impulseDataLength to 
@@ -166,7 +166,9 @@ int Raw_Data_Ptr_B = 0;
 int Raw_Data_Ptr_C = 0;    // use for linear or cosine, also edit 'outerPtr-2' in inner loop to 'outerPtr'
 int Raw_Data_Ptr_D = 0;    // use for linear or cosine, also edit 'outerPtr-2' in inner loop to 'outerPtr'
 
-float muValue = 0;
+// decimal fraction between 0 and 1, 
+//proportional to interpolated x axis between original points
+float muValue = 0; 
 
 // ==============================================================================================
 // Set Objects
@@ -247,11 +249,12 @@ void draw() {
     if (Raw_Data_Ptr_A > -1) {
       if ((data_Array[Raw_Data_Ptr_A] < DIM_THESHOLD) && (data_Array[Raw_Data_Ptr_B] < DIM_THESHOLD) && (data_Array[Raw_Data_Ptr_C] < DIM_THESHOLD) && (data_Array[Raw_Data_Ptr_D] < DIM_THESHOLD)) { // Thresholding; ignore other data
         for (int innerPtr = 1; innerPtr < RAW_DATA_SPACING; innerPtr++) {
-          muValue = muIncrement * innerPtr; // increment mu
           int interpPtr = Raw_Data_Ptr_A + innerPtr;
-          //println("innerPtr: " + innerPtr + " interpPtr: " + interpPtr + " muValue: " + muValue);
+          muValue = muIncrement * innerPtr; // increment mu
           
-          data_Array[interpPtr] = int(CubicInterpolate(data_Array[Raw_Data_Ptr_A], data_Array[Raw_Data_Ptr_B], data_Array[Raw_Data_Ptr_C], data_Array[Raw_Data_Ptr_D], muValue));
+          //println("outerPtr: " + outerPtr + " innerPtr: " + innerPtr + " interpPtr: " + interpPtr + " muValue: " + muValue);
+          
+          data_Array[interpPtr] = int(Catmull_Rom_Interpolate(data_Array[Raw_Data_Ptr_A], data_Array[Raw_Data_Ptr_B], data_Array[Raw_Data_Ptr_C], data_Array[Raw_Data_Ptr_D], muValue));
    
           // scale the offset for the screen
           int scaledXOffset = int(map(innerPtr, 0, RAW_DATA_SPACING, 0, SCREEN_X_MULTIPLIER)); 
@@ -323,7 +326,7 @@ float CubicInterpolate(float y0,float y1, float y2,float y3, float mu)
    return(a0*mu*mu2+a1*mu2+a2*mu+a3);
 }
 
-float Breeuwsma_Catmull_Rom_Interpolate(float y0,float y1, float y2,float y3, float mu)
+float Catmull_Rom_Interpolate(float y0,float y1, float y2,float y3, float mu)
 {
   
   // Originally from Paul Breeuwsma http://www.paulinternet.nl/?page=bicubic
