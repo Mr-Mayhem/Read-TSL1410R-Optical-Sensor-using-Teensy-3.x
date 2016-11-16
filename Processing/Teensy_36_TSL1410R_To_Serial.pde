@@ -103,7 +103,7 @@ final int CONVOLUTION_OUTPUT_DATA_LENGTH = SENSOR_PIXELS + IMPULSE_KERNEL_DATA_L
 // relative to original data points. 
 
 // sensor pixel values below this level are interpolated if NUM_INTERP_POINTS > 0
-final int DIM_THESHOLD = 3400; 
+final int DIM_THESHOLD = 3000; 
 
 // This is the decimal fraction of each step during interpolation; consumed by the interpolation function
 final float muIncrement = 1/float(RAW_DATA_SPACING);
