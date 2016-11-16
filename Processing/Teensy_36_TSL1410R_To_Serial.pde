@@ -61,7 +61,7 @@ final int NBITS_ADC = 12;
 final int HIGHEST_ADC_VALUE = int(pow(2.0, float(NBITS_ADC))-1);
 
 // number of screen pixels for each data point, used for drawing plot 
-final int SCREEN_X_MULTIPLIER = 2;
+final int SCREEN_X_MULTIPLIER = 1;
 
 // screen width
 final int SCREEN_WIDTH = SENSOR_PIXELS*SCREEN_X_MULTIPLIER;
@@ -249,7 +249,7 @@ void draw() {
     // and color them with the 0 to 255 greyscale sensor value
     noStroke();
     fill(pixelColor, pixelColor, pixelColor);
-    rect(outerPtr*SCREEN_X_MULTIPLIER-1, 0, 4, 10);
+    rect(outerPtr*SCREEN_X_MULTIPLIER, 0, SCREEN_X_MULTIPLIER, 10);
     
     // Interpolation loop
     //println("outerPtr: " + outerPtr + " Raw_Data_Ptr_A: " + Raw_Data_Ptr_A + " Raw_Data_Ptr_B: " + Raw_Data_Ptr_B + " Raw_Data_Ptr_C: " + Raw_Data_Ptr_C + " Raw_Data_Ptr_D: " + Raw_Data_Ptr_D);
