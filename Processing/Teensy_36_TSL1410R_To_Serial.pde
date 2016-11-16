@@ -75,9 +75,11 @@ final int SCREEN_HEIGHT = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR;
 // number of extra inserted data points for each original data point
 final int NUM_INTERP_POINTS = 3; 
 
-final int RAW_DATA_SPACING = NUM_INTERP_POINTS + 1;  //spacing of original data in the array
+// spacing of original data in the array
+final int RAW_DATA_SPACING = NUM_INTERP_POINTS + 1;  
 
-final int INTERP_OUT_LENGTH = (SENSOR_PIXELS * RAW_DATA_SPACING) - NUM_INTERP_POINTS; //number of discrete values in the output array
+//number of discrete values in the output array
+final int INTERP_OUT_LENGTH = (SENSOR_PIXELS * RAW_DATA_SPACING) - NUM_INTERP_POINTS; 
 
 // twice the pixel count because we use 2 bytes to represent each sensor pixel
 final int N_BYTES_PER_SENSOR_FRAME = SENSOR_PIXELS * 2; //
@@ -104,7 +106,8 @@ final int CONVOLUTION_OUTPUT_DATA_LENGTH = SENSOR_PIXELS + IMPULSE_KERNEL_DATA_L
 // sensor pixel values below this level are interpolated if NUM_INTERP_POINTS > 0
 final int DIM_THESHOLD = 3000; 
 
-// This is the decimal fraction of each step during interpolation; consumed by the interpolation function
+// This is the decimal fraction of each step during interpolation, 
+// and is used as an argument into the interpolation function
 final float muIncrement = 1/float(RAW_DATA_SPACING);
 // ==============================================================================================
 // Arrays:
@@ -190,10 +193,12 @@ void setup()
   
   // Set up serial connection
   myPort = new Serial(this, "COM5", 12500000);
+  // the serial port will buffer until prefix (unique byte that equals 255) and then fire serialEvent()
   myPort.bufferUntil(PREFIX);
 }
 
 void serialEvent(Serial p) { 
+  // copy one complete sensor frame of data, plus the prefix byte, into byteArray[]
   bytesRead = p.readBytes(byteArray);
   redraw();
 } 
@@ -216,7 +221,7 @@ void draw() {
   //}
   
   // Store and Display pixel values
-  for(outerPtr=0; outerPtr < SENSOR_PIXELS-1; outerPtr++) {
+  for(outerPtr=0; outerPtr < SENSOR_PIXELS; outerPtr++) {
     Raw_Data_Ptr_A = (outerPtr - 3) * RAW_DATA_SPACING;
     Raw_Data_Ptr_B = (outerPtr - 2) * RAW_DATA_SPACING;   
     Raw_Data_Ptr_C = (outerPtr - 1) * RAW_DATA_SPACING;
@@ -226,7 +231,7 @@ void draw() {
     // shift right 2 places, and copy result into data_Array[]
     data_Array[Raw_Data_Ptr_D] = (byteArray[outerPtr<<1]<< 8 | (byteArray[(outerPtr<<1) + 1] & 0xFF))>>2;
     
-    //// Apply calibration to pixArray[i] value if coefficients are set
+    //// Apply calibration to data_Array[i] value if coefficients are set
     //if (isCalibrated) {
     //  data_Array[i] = (data_Array[i] * calCoefficients[i]) / MathMultiplier;
     //}
