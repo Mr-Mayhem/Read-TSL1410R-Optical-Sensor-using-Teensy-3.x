@@ -74,7 +74,7 @@ final int SCREEN_HEIGHT_DIVISOR = 8;
 final int SCREEN_HEIGHT = HIGHEST_ADC_VALUE/SCREEN_HEIGHT_DIVISOR;
 
 // number of extra inserted data points for each original data point
-final int NUM_INTERP_POINTS = 1; 
+final int NUM_INTERP_POINTS = 3; 
 
 final int RAW_DATA_SPACING = NUM_INTERP_POINTS + 1;  //spacing of original data in the array
 
@@ -101,6 +101,11 @@ final int IMPULSE_KERNEL_DATA_LENGTH = 19;
 final int CONVOLUTION_OUTPUT_DATA_LENGTH = SENSOR_PIXELS + IMPULSE_KERNEL_DATA_LENGTH;
 //  a decimal fraction between 0 and 1, representing smaller increment of x position 
 // relative to original data points. 
+
+// sensor pixel values below this level are interpolated if NUM_INTERP_POINTS > 0
+final int DIM_THESHOLD = 3400; 
+
+// This is the decimal fraction of each step during interpolation; consumed by the interpolation function
 final float muIncrement = 1/float(RAW_DATA_SPACING);
 // ==============================================================================================
 // Arrays:
@@ -121,9 +126,7 @@ int[] calCoefficients = new int[INTERP_OUT_LENGTH];
 // global sum of all sensor values (used for calibration)
 int sensorPixelSum = 0; 
 
-// global average of all sensor values for the current
-// data frame 
-// (used for calibration)
+// global average of all sensor values for the current data frame  (used for calibration)
 int sensorAverageValue = 0; 
 
 // used to flip between modes using mouseclicks
@@ -148,7 +151,7 @@ int availableBytesDraw = 0;
 int lowestBrightness = 2000;
 int dimmestPixel = 0;
 int pixelColor = 0;
-int prevSensorValue = 0;
+boolean thresholdTriggered = false;
 
 float sensorPixelSpacing = 0.0635; //63.5 microns
 float sensorPixelsPerMM = 15.74803149606299;
@@ -196,6 +199,7 @@ void serialEvent(Serial p) {
 
 void draw() {
   chartRedraws++;
+  thresholdTriggered = false;
   if (chartRedraws >= 60) {
    chartRedraws = 0;
    availableBytesDraw = myPort.available();
@@ -210,9 +214,6 @@ void draw() {
   //  setCoefficients(); //set the calibration coefficients
   //}
   
-  //sensorPixelSum = 0;
-  //storeSensorValue(0);
-  //prevSensorValue = pixArray[0];
   // Store and Display pixel values
   for(outerPtr=0; outerPtr < SENSOR_PIXELS-1; outerPtr++) {
     Raw_Data_Ptr_A = (outerPtr - 3) * RAW_DATA_SPACING;
@@ -223,7 +224,6 @@ void draw() {
     // Read a pair of bytes from the byte array, convert them into an integer, 
     // shift right 2 places, and copy result into data_Array[]
     data_Array[Raw_Data_Ptr_D] = (byteArray[outerPtr<<1]<< 8 | (byteArray[(outerPtr<<1) + 1] & 0xFF))>>2;
-    //data_ArraySum =+ pixArray[i];
     
     //// Apply calibration to pixArray[i] value if coefficients are set
     //if (isCalibrated) {
@@ -241,27 +241,26 @@ void draw() {
     noStroke();
     fill(pixelColor, pixelColor, pixelColor);
     rect(outerPtr*SCREEN_X_MULTIPLIER-1, 0, 4, 10);
-    // Interpolate
-    //println("outerPtr: " + outerPtr + " Raw_Data_Ptr_A: " + Raw_Data_Ptr_A + " Raw_Data_Ptr_B: " + Raw_Data_Ptr_B + " Raw_Data_Ptr_C: " + Raw_Data_Ptr_C + " Raw_Data_Ptr_D: " + Raw_Data_Ptr_D);
     
+    // Interpolation loop
+    //println("outerPtr: " + outerPtr + " Raw_Data_Ptr_A: " + Raw_Data_Ptr_A + " Raw_Data_Ptr_B: " + Raw_Data_Ptr_B + " Raw_Data_Ptr_C: " + Raw_Data_Ptr_C + " Raw_Data_Ptr_D: " + Raw_Data_Ptr_D);
     if (Raw_Data_Ptr_A > -1) {
-      muValue=0;
-      for (int innerPtr = 1; innerPtr < RAW_DATA_SPACING; innerPtr++) {
-        muValue = muIncrement * innerPtr; // increment mu
-        int interpPtr = Raw_Data_Ptr_A + innerPtr;
-        //println("innerPtr: " + innerPtr + " interpPtr: " + interpPtr + " muValue: " + muValue);
-        
-        data_Array[interpPtr] = int(CubicInterpolate(data_Array[Raw_Data_Ptr_A], data_Array[Raw_Data_Ptr_B], data_Array[Raw_Data_Ptr_C], data_Array[Raw_Data_Ptr_D], muValue));
- 
-        // scale the offset for the screen
-        int scaledXOffset = int(map(innerPtr, 0, RAW_DATA_SPACING, 0, SCREEN_X_MULTIPLIER)); 
-        
-        //strokeWeight(2);
-        
-        // plot an interpolated point using the scaled x offset
-        stroke(COLOR_INTERPERPOLATED_DATA);
-        point(((outerPtr-2)*SCREEN_X_MULTIPLIER)+scaledXOffset, SCREEN_HEIGHT - (data_Array[interpPtr]/SCREEN_HEIGHT_DIVISOR));
-        }
+      if ((data_Array[Raw_Data_Ptr_A] < DIM_THESHOLD) && (data_Array[Raw_Data_Ptr_B] < DIM_THESHOLD) && (data_Array[Raw_Data_Ptr_C] < DIM_THESHOLD) && (data_Array[Raw_Data_Ptr_D] < DIM_THESHOLD)) { // Thresholding; ignore other data
+        for (int innerPtr = 1; innerPtr < RAW_DATA_SPACING; innerPtr++) {
+          muValue = muIncrement * innerPtr; // increment mu
+          int interpPtr = Raw_Data_Ptr_A + innerPtr;
+          //println("innerPtr: " + innerPtr + " interpPtr: " + interpPtr + " muValue: " + muValue);
+          
+          data_Array[interpPtr] = int(CubicInterpolate(data_Array[Raw_Data_Ptr_A], data_Array[Raw_Data_Ptr_B], data_Array[Raw_Data_Ptr_C], data_Array[Raw_Data_Ptr_D], muValue));
+   
+          // scale the offset for the screen
+          int scaledXOffset = int(map(innerPtr, 0, RAW_DATA_SPACING, 0, SCREEN_X_MULTIPLIER)); 
+          
+          // plot an interpolated point using the scaled x offset
+          stroke(COLOR_INTERPERPOLATED_DATA);
+          point(((outerPtr-2)*SCREEN_X_MULTIPLIER)+scaledXOffset, SCREEN_HEIGHT - (data_Array[interpPtr]/SCREEN_HEIGHT_DIVISOR));
+         }
+      }
     }
   }
 }
