@@ -162,7 +162,10 @@ float sensorWidthAllPixels = 16.256; // millimeters
 float widthsubpixellp = 2;
 int captureCount = 0;
 
-int outerPtr = 0;          // outer loop pointer 0
+int outerPtr = 0;          // outer loop pointer
+int innerPtr = 0;          // inner loop pointer
+int interpPtr = 0;         // interpolation pointer
+int scaledXOffset = 0;     // interpolation X offset scaled to match the screen X (width) scaling
 int Raw_Data_Ptr_A = 0;    //indexes for original data, feeds interpolation function inputs
 int Raw_Data_Ptr_B = 0;
 int Raw_Data_Ptr_C = 0;    // use for linear or cosine, also edit 'outerPtr-2' in inner loop to 'outerPtr'
@@ -252,16 +255,16 @@ void draw() {
     //println("outerPtr: " + outerPtr + " Raw_Data_Ptr_A: " + Raw_Data_Ptr_A + " Raw_Data_Ptr_B: " + Raw_Data_Ptr_B + " Raw_Data_Ptr_C: " + Raw_Data_Ptr_C + " Raw_Data_Ptr_D: " + Raw_Data_Ptr_D);
     if (Raw_Data_Ptr_A > -1) {
       if ((data_Array[Raw_Data_Ptr_A] < DIM_THESHOLD) && (data_Array[Raw_Data_Ptr_B] < DIM_THESHOLD) && (data_Array[Raw_Data_Ptr_C] < DIM_THESHOLD) && (data_Array[Raw_Data_Ptr_D] < DIM_THESHOLD)) { // Thresholding; ignore other data
-        for (int innerPtr = 1; innerPtr < RAW_DATA_SPACING; innerPtr++) {
-          int interpPtr = Raw_Data_Ptr_A + innerPtr;
+        for (innerPtr = 1; innerPtr < RAW_DATA_SPACING; innerPtr++) {
+          interpPtr = Raw_Data_Ptr_A + innerPtr;
           muValue = muIncrement * innerPtr; // increment mu
           
           //println("outerPtr: " + outerPtr + " innerPtr: " + innerPtr + " interpPtr: " + interpPtr + " muValue: " + muValue);
           
           data_Array[interpPtr] = int(Catmull_Rom_Interpolate(data_Array[Raw_Data_Ptr_A], data_Array[Raw_Data_Ptr_B], data_Array[Raw_Data_Ptr_C], data_Array[Raw_Data_Ptr_D], muValue));
    
-          // scale the offset for the screen
-          int scaledXOffset = int(map(innerPtr, 0, RAW_DATA_SPACING, 0, SCREEN_X_MULTIPLIER)); 
+          // scale the X offset for the screen
+          scaledXOffset = int(map(innerPtr, 0, RAW_DATA_SPACING, 0, SCREEN_X_MULTIPLIER)); 
           
           // plot an interpolated point using the scaled x offset
           stroke(COLOR_INTERPERPOLATED_DATA);
