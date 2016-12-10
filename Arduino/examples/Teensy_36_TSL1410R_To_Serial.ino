@@ -60,11 +60,14 @@ void initADC()
 // arguments are CLKpin, SIpin, Apin1, Apin2
 TSL1410R Sensor(CLKpin, SIpin, Apin1, Apin2);  //sensor object
 
-void setup() 
+void setup()
 {
-  Serial.begin(115200);
+  // always is 12.5 megabits per second (12500000) on Teensy 3.6, despite this setting
+  Serial.begin(12500000); 
   initADC();
-  Sensor.ExposureMicroseconds = 500;
+
+  // Set the time light is collected before starting read out
+  Sensor.ExposureMicroseconds = 750;
 }
 
 void loop() 
