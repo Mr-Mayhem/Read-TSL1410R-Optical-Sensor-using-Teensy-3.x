@@ -11,10 +11,11 @@
 #include <ADC.h> // https://github.com/pedvide/ADC
 //========================================================================================
 // Pins for the TSL1410R sensor.
-#define CLKpin  24 // <-- Teensy 3.6 pin delivering the clock pulses to pin 4(CLK) of the TSL1410R
-#define SIpin   25 // <-- Teensy 3.6 pin delivering the SI (serial-input) pulse to pin 2 of the TSL1410R
+#define CLKpin  24 // <-- Teensy 3.6 pin delivering the clock pulses to pins 4 and 10 (CLK) of the TSL1410R
+#define SIpin   25 // <-- Teensy 3.6 pin delivering the SI (serial-input) pulse to pins 2, 3, 8, and 9 of the TSL1410R
 #define Apin1   14 // <-- Teensy 3.6 pin connected to pin 6 (analog output 1) of the TSL1410R
 #define Apin2   39 // <-- Teensy 3.6 pin connected to pin 12 (analog output 2) of the TSL1410R (parallel mode only)
+// Discussion at: https://forum.pjrc.com/threads/39376-New-library-and-example-Read-TSL1410R-Optical-Sensor-using-Teensy-3-x
 //========================================================================================
 ADC *adc = new ADC(); // adc object;
 ADC::Sync_result ADCresult; // makes Teensy ADC library read 2 pins at the same time using 2 seperate ADCs
