@@ -6,6 +6,14 @@
   
   Created by Douglas Mayhew, November, 8 2016.
   Released into the public domain.
+  
+  Paired originally with a basic data visualizer written in Processing for viewing the output:
+  https://github.com/Mr-Mayhem/Read-TSL1410R-Optical-Sensor-using-Teensy-3.x/tree/master/Processing
+  
+  Do not neglect to try my latest data visualizer written in Processing 
+  (with all subpixel resolution and many more cool features):
+  (If you try it, remember to set sigGenOutput to 3 and SENSOR_PIXELS to 1280)
+  https://github.com/Mr-Mayhem/Linear_Array_Sensor_Subpixel_Visualizer
 */
 #include <TSL1410R.h>
 #include <ADC.h> // https://github.com/pedvide/ADC
@@ -58,7 +66,7 @@ void initADC()
     #endif
 }
 // arguments are CLKpin, SIpin, Apin1, Apin2
-TSL1410R Sensor(CLKpin, SIpin, Apin1, Apin2);  //sensor object
+TSL1410R Sensor(CLKpin, SIpin, Apin1, Apin2);  // sensor object
 
 void setup()
 {
@@ -66,7 +74,11 @@ void setup()
   Serial.begin(12500000); 
   initADC();
 
-  // Set the time light is collected before starting read out
+  // Set the length of time that light is collected before starting the read-out: 
+  // A higher setting increases data height and sensitivity, but takes more time and slows down the framerate.
+  // A lower setting decreases data height and sensitivity, but takes less time and speeds up the framerate.
+  // I use 750 to 1000 for most casual experiments with a bright LED, but the same light source in close 
+  // proximity will need less, so experiment to find the sweet spot.
   Sensor.ExposureMicroseconds = 750;
 }
 
