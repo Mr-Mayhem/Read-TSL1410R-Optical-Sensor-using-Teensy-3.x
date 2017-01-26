@@ -28,6 +28,8 @@ https://processing.org/
 Latest improvements:
 ===============================================================================================================================
 
+Fixed a bug in the Adruino library TSL1410R.ccp file, where the clock-out loop max was 1080 not 1280 as it should be.
+
 This version includes different serial port code, using bufferuntil and serialevent, which avoids a long start-up pause and latency. The earlier code had the plot lagging way behind until it caught up.
 
 I added an interpolation feature, so setting NUM_INTERP_POINTS > 0 will draw green colored points in-between the original data points. You can turn off interpolation by setting NUM_INTERP_POINTS to 0. They are stored in the data array alongside the original data. (The original data is spaced out in the array, to allow room for the additional interpolated points) 
