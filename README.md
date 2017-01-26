@@ -28,6 +28,8 @@ https://processing.org/
 Latest improvements:
 ===============================================================================================================================
 
+Fixed comments on pin numbers to better reflect reality.
+
 Fixed a bug in the Adruino library TSL1410R.ccp file, where the clock-out loop max was 1080 not 1280 as it should be.
 
 This version includes different serial port code, using bufferuntil and serialevent, which avoids a long start-up pause and latency. The earlier code had the plot lagging way behind until it caught up.
