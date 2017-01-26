@@ -18,7 +18,7 @@ int _Apin2 =  39;  // <-- Arduino pin connected to pin 12 (analog output 2) (par
 
 uint16_t _sample1 = 0; // temporary place to hold A0 ADC value
 uint16_t _sample2 = 0; // temporary place to hold A1 ADC value
-uint16_t ExposureMicroseconds =500;
+uint16_t ExposureMicroseconds = 500;
 extern ADC *adc;
 extern ADC::Sync_result ADCresult;
 
@@ -72,10 +72,10 @@ void TSL1410R::read(uint8_t * data, uint32_t len)
 
   // A new measuring cycle is starting once 18 clock pulses have passed. At
   // that time, the photodiodes are once again active. We clock out the SI pulse through
-  // the 1080 bit register in order to be ready to halt the ongoing measurement at our will
+  // the 1280 bit register in order to be ready to halt the ongoing measurement at our will
   // (by clocking in a new SI pulse upon the next loop):
 
-  for (int i = 0; i < 1080; i++) {// 0 to 1079 = 1 to 1080 clock pulses(pixels)
+  for (int i = 0; i < 1280; i++) {// 0 to 1279 = 1 to 1280 clock pulses(pixels)
     //      if (i == 18)
     //      {
     //        // Now the photodiodes goes active..
@@ -87,7 +87,7 @@ void TSL1410R::read(uint8_t * data, uint32_t len)
 
   // The integration time of the current program / measurement cycle is ~3ms (On Arduino 16 Mhz). 
   // If a larger timeb of integration is wanted, uncomment the next line:
-  delayMicroseconds(ExposureMicroseconds); // <-- Add 500 microseconds integration time
+  delayMicroseconds(ExposureMicroseconds); // <-- Add ExposureMicroseconds integration time
 
   // Stop the ongoing integration of light quanta from each photodiode by clocking in a new 
   // SI pulse into the sensors register:
@@ -97,7 +97,7 @@ void TSL1410R::read(uint8_t * data, uint32_t len)
   digitalWrite(_SIpin, LOW);
   digitalWrite(_CLKpin, LOW);
   
-  // Next, read all 1080 pixels, 2 at a time (parallel mode). 
+  // Next, read all 1280 pixels, 2 at a time (parallel mode). 
   // Teensy ADC library goes one step further, reading both pins at the same moment, rather than
   // one after the other, so twice as fast almost, at least in theory.
   // Store the result in the array. Each clock pulse causes a new pair of pixels to expose its 
